@@ -98,8 +98,3 @@ if st.button('Show Time Series Analysis') and company:
     plt.title(f'Time Series Analysis for {company}')
     plt.legend()
     st.pyplot(plt.gcf())
-
-# Save the updated dataset with financial ratios
-data_cleaned.to_csv('financial_analysis_with_ratios.csv', index=False)
-
-st.write("Analysis completed and results saved to 'financial_analysis_with_ratios.csv'")

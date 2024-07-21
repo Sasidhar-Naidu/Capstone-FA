@@ -155,7 +155,180 @@ def plot_geographic_analysis(df):
 
 plot_geographic_analysis(data_cleaned)
 
-# Save the updated dataset with financial ratios
-data_cleaned.to_csv('financial_analysis_with_ratios.csv', index=False)
+# Net Income Analysis with Scenario Modeling
+def scenario_modeling(df, scenario):
+    if scenario == 'economic_downturn':
+        df['NetIncome_Scenario'] = df['NetIncome'] * 0.8
+    elif scenario == 'market_boom':
+        df['NetIncome_Scenario'] = df['NetIncome'] * 1.2
+    else:
+        df['NetIncome_Scenario'] = df['NetIncome']
+    return df
 
-print("Analysis completed and results saved to 'financial_analysis_with_ratios.csv'")
+# Apply scenario modeling
+data_base = scenario_modeling(data_cleaned.copy(), 'base')
+data_downturn = scenario_modeling(data_cleaned.copy(), 'economic_downturn')
+data_boom = scenario_modeling(data_cleaned.copy(), 'market_boom')
+
+# Combine the data for plotting
+data_scenarios = data_cleaned[['Company', 'NetIncome']].copy()
+data_scenarios['NetIncome_Economic_Downturn'] = data_downturn['NetIncome_Scenario']
+data_scenarios['NetIncome_Market_Boom'] = data_boom['NetIncome_Scenario']
+
+# Rename the base scenario for clarity
+data_scenarios.rename(columns={'NetIncome': 'NetIncome_Base'}, inplace=True)
+
+# Melt the data for seaborn plotting
+data_scenarios_melted = data_scenarios.melt(id_vars='Company', var_name='Scenario', value_name='NetIncome')
+
+# Plot the scenarios
+plt.figure(figsize=(14, 7))
+sns.barplot(x='Company', y='NetIncome', hue='Scenario', data=data_scenarios_melted)
+plt.title('Net Income under Different Scenarios')
+plt.xlabel('Company')
+plt.ylabel('Net Income')
+plt.legend(title='Scenario')
+plt.show()
+
+# ROA Analysis with Benchmarking
+data_cleaned['ROA'] = data_cleaned['Profit'] / data_cleaned['Assets']
+industry_roa_benchmark = data_cleaned.groupby('Industry')['ROA'].mean()
+
+# Plot ROA
+plt.figure(figsize=(10, 6))
+sns.barplot(x=industry_roa_benchmark.index, y=industry_roa_benchmark.values)
+plt.title('ROA Benchmarked Against Industry Standards')
+plt.xlabel('Industry')
+plt.ylabel('ROA')
+plt.show()
+
+# EPS by Industry with Time Series Analysis
+if 'MarketCap' in data_cleaned.columns and 'EarningsPerShare' in data_cleaned.columns:
+    data_cleaned['SharesOutstanding'] = data_cleaned['MarketCap'] / data_cleaned['EarningsPerShare']
+else:
+    print("\nColumns 'MarketCap' or 'EarningsPerShare' are missing, SharesOutstanding calculation skipped.")
+
+if 'SharesOutstanding' in data_cleaned.columns:
+    data_cleaned['EPS'] = data_cleaned['NetIncome'] / data_cleaned['SharesOutstanding']
+    industry_eps = data_cleaned.groupby('Industry')['EPS'].mean()
+
+    # Plot EPS
+    plt.figure(figsize=(10, 6))
+    sns.barplot(x=industry_eps.index, y=industry_eps.values)
+    plt.title('EPS Compared Across Industries')
+    plt.xlabel('Industry')
+    plt.ylabel('EPS')
+    plt.show()
+else:
+    print("\nColumns 'MarketCap' or 'EarningsPerShare' are missing, EPS calculation skipped.")
+
+# Revenue Ranking with Advanced Visualization
+data_cleaned['RevenueRank'] = data_cleaned['Revenue'].rank(ascending=False)
+plt.figure(figsize=(14, 7))
+sns.barplot(x='RevenueRank', y='Revenue', data=data_cleaned)
+plt.title('Revenue Ranking')
+plt.show()
+print("\nRevenue ranking completed and visualized.")
+
+# CAGR Calculation with Sensitivity Analysis
+
+def calculate_cagr(start_value, end_value, periods):
+    return ((end_value / start_value)**(1/periods) - 1) * 100
+
+# Ensure 'Year' column is available
+if 'Date' in data_cleaned.columns:
+    data_cleaned['Year'] = data_cleaned['Date'].dt.year
+
+# Calculate CAGR for each company based on available years
+cagr_values = {}
+
+for company in data_cleaned['Company'].unique():
+    company_data = data_cleaned[data_cleaned['Company'] == company]
+    min_year = company_data['Year'].min()
+    max_year = company_data['Year'].max()
+    
+    if min_year != max_year:
+        start_value = company_data[company_data['Year'] == min_year]['Revenue'].values[0]
+        end_value = company_data[company_data['Year'] == max_year]['Revenue'].values[0]
+        periods = max_year - min_year
+        cagr = calculate_cagr(start_value, end_value, periods)
+        cagr_values[company] = cagr
+
+# CAGR Calculation with Sensitivity Analysis
+
+def calculate_cagr(start_value, end_value, periods):
+    return ((end_value / start_value)**(1/periods) - 1) * 100
+
+# Ensure 'Year' column is available
+if 'Date' in data_cleaned.columns:
+    data_cleaned['Year'] = data_cleaned['Date'].dt.year
+
+# Verify revenue data and calculate CAGR for each company
+cagr_values = {}
+revenue_data = {}
+
+for company in data_cleaned['Company'].unique():
+    company_data = data_cleaned[data_cleaned['Company'] == company]
+    min_year = company_data['Year'].min()
+    max_year = company_data['Year'].max()
+    
+    if min_year != max_year:
+        start_value = company_data[company_data['Year'] == min_year]['Revenue'].values[0]
+        end_value = company_data[company_data['Year'] == max_year]['Revenue'].values[0]
+        periods = max_year - min_year
+        cagr = calculate_cagr(start_value, end_value, periods)
+        cagr_values[company] = cagr
+        revenue_data[company] = (min_year, start_value, max_year, end_value)
+
+# Convert CAGR values to DataFrame
+cagr_df = pd.DataFrame(list(cagr_values.items()), columns=['Company', 'CAGR'])
+revenue_df = pd.DataFrame.from_dict(revenue_data, orient='index', columns=['Start_Year', 'Start_Revenue', 'End_Year', 'End_Revenue'])
+
+# Display revenue data for verification
+print("\nRevenue data used for CAGR calculation:\n", revenue_df)
+print("\nCAGR values for each company:\n", cagr_df)
+
+# Plot CAGR values
+plt.figure(figsize=(14, 7))
+sns.barplot(x='Company', y='CAGR', data=cagr_df)
+plt.title('CAGR for Each Company')
+plt.xlabel('Company')
+plt.ylabel('CAGR (%)')
+plt.xticks(rotation=45)
+plt.show()
+
+# Sensitivity analysis
+def sensitivity_analysis(df, column, factor):
+    df[f'{column}_Sensitivity'] = df[column] * factor
+    return df
+
+# Example: Perform sensitivity analysis on NetIncome
+data_sensitivity = sensitivity_analysis(data_cleaned.copy(), 'NetIncome', 1.1)
+print("\nSensitivity analysis completed.")
+
+# Profit Distribution with Statistical Analysis
+plt.figure(figsize=(14, 7))
+box = sns.boxplot(x='Industry', y='Profit', data=data_cleaned)
+strip = sns.stripplot(x='Industry', y='Profit', data=data_cleaned, color='red', size=5, jitter=True, dodge=True)
+
+# Adding median values on the plot
+medians = data_cleaned.groupby(['Industry'])['Profit'].median().values
+median_labels = [f'{med:2.2f}' for med in medians]
+
+for tick, label in zip(range(len(medians)), median_labels):
+    box.text(tick, medians[tick] + 1000, label, 
+             horizontalalignment='center', size='small', color='w', weight='semibold')
+
+plt.title('Profit Distribution by Industry')
+plt.show()
+print("\nProfit distribution visualized.")
+
+# Display descriptive statistics for profit by industry
+profit_stats = data_cleaned.groupby('Industry')['Profit'].describe()
+print("\nDescriptive statistics for profit by industry:\n", profit_stats)
+
+# Statistical analysis
+import scipy.stats as stats
+anova_result = stats.f_oneway(*[group['Profit'].values for name, group in data_cleaned.groupby('Industry')])
+print("\nANOVA result for profit distribution by industry:")
+print(anova_result)
